@@ -6,9 +6,9 @@ const ADMIN_PASSWORD = "cambiar123";
 test.describe("Flujo de ingreso", () => {
   test("landing carga con la marca y CTA de ingreso", async ({ page }) => {
     await page.goto("/");
-    await expect(page).toHaveTitle(/Mi Sistema/);
+    await expect(page).toHaveTitle(/Panel MiniSaaS/);
     await expect(
-      page.getByRole("heading", { name: "Mi Sistema" }),
+      page.getByRole("heading", { name: "Panel MiniSaaS" }),
     ).toBeVisible();
     await expect(page.getByRole("link", { name: "Ingresar" })).toBeVisible();
   });
@@ -29,8 +29,8 @@ test.describe("Flujo de ingreso", () => {
     await page.waitForURL("**/inicio", { timeout: 30_000 });
 
     await expect(page.getByText(/Hola,/)).toBeVisible();
-    await expect(page.getByText("Clientes activos")).toBeVisible();
-    await expect(page.getByText("Etiquetas activas")).toBeVisible();
+    await expect(page.getByText("Capacidad usada")).toBeVisible();
+    await expect(page.getByText("MRR (clientes activos)")).toBeVisible();
   });
 
   test("rechaza credenciales incorrectas con mensaje claro", async ({

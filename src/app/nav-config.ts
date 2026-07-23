@@ -1,11 +1,13 @@
 /**
  * Árbol de navegación de ESTE sistema — zona custom: editalo libremente.
  * El core solo dibuja lo que armes acá (ver src/core/ui/dashboard/sidebar.tsx).
+ *
+ * Principio del panel: todo a la vista, sin submenús escondidos.
  */
 import {
   LayoutDashboard,
-  Users,
-  Tags,
+  Building2,
+  Clock,
   UserCog,
   Settings,
   ShieldCheck,
@@ -18,8 +20,9 @@ export function obtenerNavGrupos(roles: string[]): NavGrupo[] {
   const grupos: NavGrupo[] = [
     {
       items: [
-        { href: "/inicio", label: "Inicio", icon: LayoutDashboard },
-        { href: "/clientes", label: "Clientes", icon: Users },
+        { href: "/inicio", label: "Salud del negocio", icon: LayoutDashboard },
+        { href: "/clientes", label: "Clientes", icon: Building2 },
+        { href: "/horas", label: "Registro de horas", icon: Clock },
       ],
     },
   ];
@@ -27,10 +30,7 @@ export function obtenerNavGrupos(roles: string[]): NavGrupo[] {
   if (tieneRolGestion(roles)) {
     grupos.push({
       titulo: "Administración",
-      items: [
-        { href: "/etiquetas", label: "Etiquetas", icon: Tags },
-        { href: "/configuracion", label: "Configuración", icon: Settings },
-      ],
+      items: [{ href: "/configuracion", label: "Configuración", icon: Settings }],
     });
   }
 

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Tags, UserCog } from "lucide-react";
+import { Layers, Gauge, UserCog } from "lucide-react";
 
 import { auth } from "@/core/auth";
 import { esSuperAdmin, tieneRolGestion } from "@/core/permisos";
@@ -16,10 +16,18 @@ export const metadata = { title: "Configuración" };
 
 const SECCIONES = [
   {
-    href: "/etiquetas",
-    titulo: "Etiquetas",
-    descripcion: "Catálogo configurable con el que se clasifican los clientes.",
-    icono: Tags,
+    href: "/configuracion/rubros",
+    titulo: "Rubros",
+    descripcion: "Catálogo configurable con el que clasificás a tus clientes.",
+    icono: Layers,
+    soloSuperAdmin: false,
+  },
+  {
+    href: "/configuracion/capacidad",
+    titulo: "Capacidad",
+    descripcion:
+      "Horas de soporte y clientes objetivo. Define el umbral de horas por cliente.",
+    icono: Gauge,
     soloSuperAdmin: false,
   },
   {
@@ -47,7 +55,7 @@ export default async function ConfiguracionPage() {
           Configuración
         </h1>
         <p className="text-sm text-muted-foreground">
-          Catálogos y ajustes del sistema.
+          Catálogos y ajustes del panel.
         </p>
       </header>
 

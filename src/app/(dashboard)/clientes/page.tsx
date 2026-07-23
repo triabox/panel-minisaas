@@ -1,7 +1,7 @@
 import { auth } from "@/core/auth";
 import { tieneRolGestion } from "@/core/permisos";
 import { listarClientes } from "@/modules/clientes/actions";
-import { listarEtiquetasActivas } from "@/modules/etiquetas/actions";
+import { listarRubrosActivos } from "@/modules/rubros/actions";
 
 import { ClientesTable } from "./clientes-table";
 import { NuevoClienteButton } from "./nuevo-cliente-button";
@@ -12,9 +12,9 @@ export default async function ClientesPage() {
   const session = await auth();
   const roles = session?.user.roles ?? [];
 
-  const [clientes, etiquetas] = await Promise.all([
+  const [clientes, rubros] = await Promise.all([
     listarClientes(),
-    listarEtiquetasActivas(),
+    listarRubrosActivos(),
   ]);
 
   return (
@@ -25,16 +25,16 @@ export default async function ClientesPage() {
             Clientes
           </h1>
           <p className="text-sm text-muted-foreground">
-            Módulo de ejemplo del template: entidad con etiquetas, búsqueda y
-            auditoría.
+            Cada negocio al que le operás un mini-SaaS. El riesgo se enciende
+            solo: pago demorado o exceso de horas del mes.
           </p>
         </div>
-        <NuevoClienteButton etiquetas={etiquetas} />
+        <NuevoClienteButton rubros={rubros} />
       </header>
 
       <ClientesTable
         clientes={clientes}
-        etiquetas={etiquetas}
+        rubros={rubros}
         esGestion={tieneRolGestion(roles)}
       />
     </div>

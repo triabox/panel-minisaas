@@ -4,18 +4,18 @@ import { useState } from "react";
 import { Plus } from "lucide-react";
 
 import { Button } from "@/core/ui/button";
-import { EtiquetaFormDialog } from "./etiqueta-form-dialog";
+import { TicketFormDialog } from "./ticket-form-dialog";
 
-export function NuevaEtiquetaButton() {
+export function NuevoTicketButton() {
   const [open, setOpen] = useState(false);
 
   return (
     <>
       <Button onClick={() => setOpen(true)}>
         <Plus className="size-4" />
-        Nueva etiqueta
+        Cargar horas
       </Button>
-      <EtiquetaFormDialog open={open} onOpenChange={setOpen} />
+      <TicketFormDialog open={open} onOpenChange={setOpen} />
     </>
   );
 }

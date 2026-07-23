@@ -1,30 +1,52 @@
 import { z } from "zod";
 
+/** "" → undefined para todos los opcionales de texto. */
+const textoOpcional = (max: number, msg?: string) =>
+  z.preprocess(
+    (v) => (v === "" || v == null ? undefined : v),
+    z
+      .string()
+      .trim()
+      .max(max, msg ?? "Texto demasiado largo.")
+      .optional(),
+  );
+
 /**
- * MÓDULO DE EJEMPLO — patrón "entidad de negocio".
- * Muestra el ciclo completo: schema compartido cliente/servidor, CRUD con
- * permisos y auditoría, relación con un catálogo. Renombralo o borralo al
- * armar tu dominio real.
+ * Un cliente = un negocio al que le opero un mini-SaaS. El mismo schema valida
+ * la server action y el form (RHF). El estado de pago se carga a mano en el MVP
+ * (en v2 lo actualiza el webhook de Mercado Pago).
  */
 export const clienteInputSchema = z.object({
-  nombre: z
+  negocio: z
     .string()
     .trim()
-    .min(2, "El nombre debe tener al menos 2 caracteres.")
+    .min(2, "El nombre del negocio debe tener al menos 2 caracteres.")
     .max(120),
-  email: z.preprocess(
+  rubroId: z.preprocess(
+    (v) => (v === "" || v == null ? undefined : v),
+    z.string().optional(),
+  ),
+  sistema: textoOpcional(120),
+  contactoNombre: textoOpcional(120),
+  contactoEmail: z.preprocess(
     (v) => (v === "" || v == null ? undefined : v),
     z.string().trim().toLowerCase().email("Email inválido.").optional(),
   ),
-  telefono: z.preprocess(
-    (v) => (v === "" || v == null ? undefined : v),
-    z.string().trim().max(30).optional(),
-  ),
-  notas: z.preprocess(
-    (v) => (v === "" || v == null ? undefined : v),
-    z.string().trim().max(1000, "Las notas son muy largas.").optional(),
-  ),
-  etiquetasIds: z.array(z.string()).default([]),
+  contactoTelefono: textoOpcional(30),
+  fechaAlta: z.coerce.date({ message: "Fecha de alta inválida." }),
+  abonoMensual: z.coerce
+    .number({ message: "El abono tiene que ser un número." })
+    .min(0, "El abono no puede ser negativo.")
+    .max(1_000_000),
+  moneda: z.enum(["USD", "ARS"]).default("USD"),
+  estado: z.enum(["activo", "pausado", "baja"]).default("activo"),
+  estadoPago: z.enum(["al_dia", "demorado", "vencido"]).default("al_dia"),
+  notas: textoOpcional(1000, "Las notas son muy largas."),
 });
 
 export type ClienteInput = z.input<typeof clienteInputSchema>;
+
+/** Schema del cambio de estado comercial (activar / pausar / dar de baja). */
+export const cambioEstadoSchema = z.object({
+  estado: z.enum(["activo", "pausado", "baja"]),
+});

@@ -13,31 +13,28 @@ import {
 } from "@/core/ui/dropdown-menu";
 import { Button } from "@/core/ui/button";
 import { toast } from "sonner";
-import {
-  eliminarEtiqueta,
-  toggleEtiquetaActiva,
-} from "@/modules/etiquetas/actions";
-import { EtiquetaFormDialog } from "./etiqueta-form-dialog";
+import { eliminarRubro, toggleRubroActivo } from "@/modules/rubros/actions";
 
-type EtiquetaRow = {
+import { RubroFormDialog } from "./rubro-form-dialog";
+
+type Rubro = {
   id: string;
   codigo: string;
   nombre: string;
   activo: boolean;
   orden: number;
-  cantidadUsos: number;
 };
 
-export function EtiquetaAcciones({ etiqueta }: { etiqueta: EtiquetaRow }) {
+export function RubroAcciones({ rubro }: { rubro: Rubro }) {
   const router = useRouter();
-  const [editing, setEditing] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [, startTransition] = useTransition();
 
   const onToggle = () => {
     startTransition(async () => {
-      const res = await toggleEtiquetaActiva(etiqueta.id);
+      const res = await toggleRubroActivo(rubro.id);
       if (res.ok) {
-        toast.success(res.data.activo ? "Etiqueta activada" : "Etiqueta desactivada");
+        toast.success(res.data.activo ? "Rubro activado" : "Rubro desactivado");
         router.refresh();
       } else {
         toast.error(res.error);
@@ -46,17 +43,11 @@ export function EtiquetaAcciones({ etiqueta }: { etiqueta: EtiquetaRow }) {
   };
 
   const onEliminar = () => {
-    if (
-      !window.confirm(
-        `¿Eliminar la etiqueta "${etiqueta.nombre}"? Esta acción no se puede deshacer.`,
-      )
-    ) {
-      return;
-    }
+    if (!window.confirm(`¿Eliminar el rubro "${rubro.nombre}"?`)) return;
     startTransition(async () => {
-      const res = await eliminarEtiqueta(etiqueta.id);
+      const res = await eliminarRubro(rubro.id);
       if (res.ok) {
-        toast.success("Etiqueta eliminada");
+        toast.success("Rubro eliminado.");
         router.refresh();
       } else {
         toast.error(res.error);
@@ -71,36 +62,29 @@ export function EtiquetaAcciones({ etiqueta }: { etiqueta: EtiquetaRow }) {
           <Button
             size="icon"
             variant="ghost"
-            aria-label={`Acciones para ${etiqueta.nombre}`}
+            aria-label={`Acciones para ${rubro.nombre}`}
           >
             <MoreHorizontal className="size-4" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-48">
-          <DropdownMenuItem onSelect={() => setEditing(true)}>
-            <Pencil className="size-4" /> Editar
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onSelect={() => setEditOpen(true)}>
+            <Pencil className="size-4" />
+            Editar
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={onToggle}>
             <Power className="size-4" />
-            {etiqueta.activo ? "Desactivar" : "Activar"}
+            {rubro.activo ? "Desactivar" : "Activar"}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onSelect={onEliminar}
-            disabled={etiqueta.cantidadUsos > 0}
-            className="text-destructive focus:text-destructive"
-          >
+          <DropdownMenuItem variant="destructive" onSelect={onEliminar}>
             <Trash2 className="size-4" />
             Eliminar
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <EtiquetaFormDialog
-        open={editing}
-        onOpenChange={setEditing}
-        initial={etiqueta}
-      />
+      <RubroFormDialog open={editOpen} onOpenChange={setEditOpen} initial={rubro} />
     </>
   );
 }

@@ -69,14 +69,16 @@ const PERMISOS_CORE = [
 ] as const;
 
 // ========================================================
-// EJEMPLO — catálogo demo (borrá/renombrá con tu dominio)
+// DOMINIO — catálogo de rubros (zona custom de este sistema)
 // ========================================================
 
-const ETIQUETAS_DEMO = [
-  { codigo: "potencial", nombre: "Potencial", orden: 10 },
-  { codigo: "activo", nombre: "Activo", orden: 20 },
-  { codigo: "vip", nombre: "VIP", orden: 30 },
-  { codigo: "inactivo", nombre: "Inactivo", orden: 90 },
+const RUBROS_DEMO = [
+  { codigo: "gastronomia", nombre: "Gastronomía", orden: 10 },
+  { codigo: "retail", nombre: "Retail / Comercio", orden: 20 },
+  { codigo: "salud", nombre: "Salud", orden: 30 },
+  { codigo: "educacion", nombre: "Educación", orden: 40 },
+  { codigo: "servicios", nombre: "Servicios profesionales", orden: 50 },
+  { codigo: "otro", nombre: "Otro", orden: 90 },
 ];
 
 async function main() {
@@ -151,16 +153,24 @@ async function main() {
   }
 
   // ========================================================
-  // EJEMPLO (zona custom de los hijos a partir de acá)
+  // DOMINIO (zona custom de este sistema a partir de acá)
   // ========================================================
-  for (const e of ETIQUETAS_DEMO) {
-    await prisma.etiqueta.upsert({
-      where: { codigo: e.codigo },
+  for (const r of RUBROS_DEMO) {
+    await prisma.rubro.upsert({
+      where: { codigo: r.codigo },
       update: {},
-      create: e,
+      create: r,
     });
   }
-  console.log(`  ✓ Etiquetas demo: ${ETIQUETAS_DEMO.length}`);
+  console.log(`  ✓ Rubros: ${RUBROS_DEMO.length}`);
+
+  // Configuración de capacidad (singleton): 120 h / 60 clientes = 2 h/cliente.
+  await prisma.configuracionCapacidad.upsert({
+    where: { id: "singleton" },
+    update: {},
+    create: { id: "singleton", horasSoporteMes: 120, clientesObjetivo: 60 },
+  });
+  console.log("  ✓ Configuración de capacidad (120 h / 60 clientes)");
 
   console.log("✅ Seed completo.");
 }

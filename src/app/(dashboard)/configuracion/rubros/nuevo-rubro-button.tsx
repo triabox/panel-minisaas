@@ -4,18 +4,18 @@ import { useState } from "react";
 import { Plus } from "lucide-react";
 
 import { Button } from "@/core/ui/button";
-import { ClienteFormDialog, type RubroOption } from "./cliente-form-dialog";
+import { RubroFormDialog } from "./rubro-form-dialog";
 
-export function NuevoClienteButton({ rubros }: { rubros: RubroOption[] }) {
+export function NuevoRubroButton() {
   const [open, setOpen] = useState(false);
 
   return (
     <>
       <Button onClick={() => setOpen(true)}>
         <Plus className="size-4" />
-        Nuevo cliente
+        Nuevo rubro
       </Button>
-      <ClienteFormDialog open={open} onOpenChange={setOpen} rubros={rubros} />
+      <RubroFormDialog open={open} onOpenChange={setOpen} />
     </>
   );
 }

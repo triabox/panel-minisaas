@@ -1,6 +1,6 @@
 "use client";
 
-import { Tags } from "lucide-react";
+import { Layers } from "lucide-react";
 
 import { Badge } from "@/core/ui/badge";
 import {
@@ -14,9 +14,9 @@ import {
 import { EmptyState } from "@/core/ui/dashboard/empty-state";
 import { TablaBuscador } from "@/core/ui/dashboard/tabla-buscador";
 
-import { EtiquetaAcciones } from "./etiqueta-acciones";
+import { RubroAcciones } from "./rubro-acciones";
 
-type Etiqueta = {
+type Rubro = {
   id: string;
   codigo: string;
   nombre: string;
@@ -25,22 +25,22 @@ type Etiqueta = {
   cantidadUsos: number;
 };
 
-export function EtiquetasTable({ etiquetas }: { etiquetas: Etiqueta[] }) {
-  if (etiquetas.length === 0) {
+export function RubrosTable({ rubros }: { rubros: Rubro[] }) {
+  if (rubros.length === 0) {
     return (
       <EmptyState
-        icon={Tags}
-        titulo="Todavía no hay etiquetas cargadas"
-        descripcion="Las etiquetas clasifican a los clientes (potencial, VIP, etc.)."
-        ctaLabel='Click en "Nueva etiqueta" arriba'
+        icon={Layers}
+        titulo="Todavía no hay rubros"
+        descripcion="Los rubros clasifican a tus clientes (gastronomía, retail, salud…)."
+        ctaLabel='Click en "Nuevo rubro" arriba'
       />
     );
   }
 
   return (
-    <TablaBuscador.Root<Etiqueta>
-      data={etiquetas}
-      searchKeys={(t) => `${t.nombre} ${t.codigo}`}
+    <TablaBuscador.Root<Rubro>
+      data={rubros}
+      searchKeys={(r) => `${r.nombre} ${r.codigo}`}
       defaultSort={{ key: "orden", dir: "asc" }}
       comparators={{
         orden: (a, b) => a.orden - b.orden,
@@ -50,7 +50,7 @@ export function EtiquetasTable({ etiquetas }: { etiquetas: Etiqueta[] }) {
     >
       {(filtrados) => (
         <div className="space-y-3">
-          <TablaBuscador.Input placeholder="Buscar etiqueta..." />
+          <TablaBuscador.Input placeholder="Buscar rubro..." />
 
           <div className="rounded-xl border border-primary-100 bg-white">
             <Table>
@@ -69,7 +69,7 @@ export function EtiquetasTable({ etiquetas }: { etiquetas: Etiqueta[] }) {
                   </TableHead>
                   <TableHead className="text-center">
                     <TablaBuscador.SortableHeader sortKey="usos">
-                      Usos
+                      Clientes
                     </TablaBuscador.SortableHeader>
                   </TableHead>
                   <TableHead className="text-center">Estado</TableHead>
@@ -85,38 +85,35 @@ export function EtiquetasTable({ etiquetas }: { etiquetas: Etiqueta[] }) {
                       colSpan={6}
                       className="h-24 text-center text-sm text-muted-foreground"
                     >
-                      No hay etiquetas que matcheen tu búsqueda.
+                      No hay rubros que matcheen tu búsqueda.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filtrados.map((t) => (
-                    <TableRow key={t.id}>
+                  filtrados.map((r) => (
+                    <TableRow key={r.id}>
                       <TableCell className="text-center text-muted-foreground">
-                        {t.orden}
+                        {r.orden}
                       </TableCell>
                       <TableCell className="font-mono text-xs text-muted-foreground">
-                        {t.codigo}
+                        {r.codigo}
                       </TableCell>
                       <TableCell className="font-medium text-primary-900">
-                        {t.nombre}
+                        {r.nombre}
                       </TableCell>
                       <TableCell className="text-center text-muted-foreground">
-                        {t.cantidadUsos}
+                        {r.cantidadUsos}
                       </TableCell>
                       <TableCell className="text-center">
-                        {t.activo ? (
+                        {r.activo ? (
                           <Badge variant="secondary">Activo</Badge>
                         ) : (
-                          <Badge
-                            variant="outline"
-                            className="text-muted-foreground"
-                          >
+                          <Badge variant="outline" className="text-muted-foreground">
                             Inactivo
                           </Badge>
                         )}
                       </TableCell>
                       <TableCell className="text-right">
-                        <EtiquetaAcciones etiqueta={t} />
+                        <RubroAcciones rubro={r} />
                       </TableCell>
                     </TableRow>
                   ))

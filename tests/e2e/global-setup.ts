@@ -15,9 +15,10 @@ loadEnv();
 
 const TABLAS = [
   "RateLimit",
-  "ClienteEtiqueta",
+  "Ticket",
   "Cliente",
-  "Etiqueta",
+  "Rubro",
+  "ConfiguracionCapacidad",
   "Documento",
   "PasswordResetToken",
   "AuditLog",

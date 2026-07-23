@@ -5,8 +5,8 @@
 //   Persona, Usuario, PasswordResetToken, Rol, Permiso, RolPermiso,
 //   UsuarioRol, AuditLog, Documento.
 //
-// EJEMPLO (zona custom — renombrar/borrar al armar tu dominio):
-//   Cliente, Etiqueta, ClienteEtiqueta.
+// DOMINIO (zona custom de este sistema):
+//   Cliente, Rubro, Ticket, ConfiguracionCapacidad.
 //
 // Convención de fechas: las "fechas calendario" se guardan a 00:00 UTC
 // (ver src/core/lib/fechas.ts); los timestamps reales llevan hora real.
@@ -197,41 +197,104 @@ model Documento {
 }
 
 // ========================================================
-// EJEMPLO — borrá o renombrá esto al armar tu dominio real.
-// Demuestra el patrón entidad (Cliente) + catálogo (Etiqueta) + N-a-N.
+// DOMINIO — Panel MiniSaaS (uso interno)
+//
+// Cliente = un negocio al que le opero un mini-SaaS (cuenta, NO Persona:
+// Persona/Usuario del kernel quedan solo para el operador del panel).
+// Ticket = el corazón: cada pedido de soporte con sus horas.
+// Rubro = catálogo configurable. ConfiguracionCapacidad = singleton que
+// deriva el umbral de horas/cliente/mes.
+//
+// Futuro (v2/v3, no en el MVP): Mejora (roadmap), Prospecto (pipeline),
+// Pago (suscripción Mercado Pago). El modelo queda abierto a sumarlas.
 // ========================================================
 
-model Cliente {
-  id        String   @id @default(cuid())
-  nombre    String
-  email     String?
-  telefono  String?
-  notas     String?
-  activo    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  etiquetas ClienteEtiqueta[]
-
-  @@index([nombre])
+/// Estado comercial del cliente. `baja` es lógica: preserva el historial de
+/// tickets para estadística (no se borra la cuenta).
+enum EstadoCliente {
+  activo
+  pausado
+  baja
 }
 
-model Etiqueta {
+/// Estado de cobranza. En el MVP se carga a mano; en v2 lo actualiza el
+/// webhook de Mercado Pago. Alimenta el semáforo de riesgo.
+enum EstadoPago {
+  al_dia
+  demorado
+  vencido
+}
+
+/// Clasificación del pedido de soporte. Regla de negocio: bug siempre gratis;
+/// feature >5h se cotiza aparte (la validación de scope llega en v2).
+enum TipoTicket {
+  bug
+  ajuste
+  feature
+  consulta
+}
+
+model Cliente {
+  id               String        @id @default(cuid())
+  negocio          String
+  rubroId          String?
+  sistema          String? // qué mini-SaaS le entregué
+  contactoNombre   String?
+  contactoEmail    String?
+  contactoTelefono String?
+  fechaAlta        DateTime // fecha calendario (00:00 UTC)
+  abonoMensual     Float         @default(100)
+  moneda           String        @default("USD")
+  estado           EstadoCliente @default(activo)
+  estadoPago       EstadoPago    @default(al_dia)
+  ultimaActividad  DateTime? // proxy de "usa el sistema" (se explota en v2/v3)
+  notas            String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  rubro   Rubro?   @relation(fields: [rubroId], references: [id], onDelete: SetNull)
+  tickets Ticket[]
+
+  @@index([negocio])
+  @@index([estado])
+}
+
+/// Catálogo configurable de rubros (gastronomía, retail, salud…).
+model Rubro {
   id     String  @id @default(cuid())
   codigo String  @unique
   nombre String
   activo Boolean @default(true)
   orden  Int     @default(0)
 
-  clientes ClienteEtiqueta[]
+  clientes Cliente[]
 }
 
-model ClienteEtiqueta {
-  clienteId  String
-  etiquetaId String
+/// El corazón del panel: cada pedido/ticket con sus horas. `fecha` es un
+/// timestamp real (cuándo se atendió). `horasHombre` es la métrica madre que
+/// se compara contra el umbral; `tiempoIa` alimenta el % atendido por IA.
+model Ticket {
+  id           String     @id @default(cuid())
+  clienteId    String
+  tipo         TipoTicket
+  descripcion  String?
+  horasHombre  Float      @default(0)
+  tiempoIa     Float      @default(0)
+  automatizado Boolean    @default(false)
+  fecha        DateTime   @default(now())
+  createdAt    DateTime   @default(now())
 
-  cliente  Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
-  etiqueta Etiqueta @relation(fields: [etiquetaId], references: [id], onDelete: Cascade)
+  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
 
-  @@id([clienteId, etiquetaId])
+  @@index([clienteId])
+  @@index([fecha])
+}
+
+/// Configuración de capacidad (fila única, id fijo "singleton"). El umbral de
+/// horas por cliente se deriva: horasSoporteMes / clientesObjetivo.
+model ConfiguracionCapacidad {
+  id               String   @id @default("singleton")
+  horasSoporteMes  Int      @default(120)
+  clientesObjetivo Int      @default(60)
+  updatedAt        DateTime @updatedAt
 }

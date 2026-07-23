@@ -29,9 +29,10 @@ export async function resetTestDb() {
   // Agregá acá cada tabla nueva de tu dominio (si te olvidás, el test lo avisa).
   const tablas = [
     "RateLimit",
-    "ClienteEtiqueta",
+    "Ticket",
     "Cliente",
-    "Etiqueta",
+    "Rubro",
+    "ConfiguracionCapacidad",
     "Documento",
     "PasswordResetToken",
     "AuditLog",

@@ -18,13 +18,10 @@ import { Button } from "@/core/ui/button";
 import { Input } from "@/core/ui/input";
 import { Label } from "@/core/ui/label";
 import type { z } from "zod";
-import { etiquetaInputSchema } from "@/modules/etiquetas/schemas";
-import {
-  actualizarEtiqueta,
-  crearEtiqueta,
-} from "@/modules/etiquetas/actions";
+import { rubroInputSchema } from "@/modules/rubros/schemas";
+import { actualizarRubro, crearRubro } from "@/modules/rubros/actions";
 
-type FormValues = z.input<typeof etiquetaInputSchema>;
+type FormValues = z.input<typeof rubroInputSchema>;
 
 type Props = {
   open: boolean;
@@ -38,11 +35,7 @@ type Props = {
   };
 };
 
-export function EtiquetaFormDialog({
-  open,
-  onOpenChange,
-  initial,
-}: Props) {
+export function RubroFormDialog({ open, onOpenChange, initial }: Props) {
   const router = useRouter();
   const [errorGlobal, setErrorGlobal] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -56,7 +49,7 @@ export function EtiquetaFormDialog({
     setError,
     formState: { errors },
   } = useForm<FormValues>({
-    resolver: zodResolver(etiquetaInputSchema),
+    resolver: zodResolver(rubroInputSchema),
     defaultValues: {
       codigo: initial?.codigo ?? "",
       nombre: initial?.nombre ?? "",
@@ -69,8 +62,8 @@ export function EtiquetaFormDialog({
     setErrorGlobal(null);
     startTransition(async () => {
       const res = editando
-        ? await actualizarEtiqueta(initial!.id, values)
-        : await crearEtiqueta(values);
+        ? await actualizarRubro(initial!.id, values)
+        : await crearRubro(values);
       if (res.ok) {
         reset();
         onOpenChange(false);
@@ -96,34 +89,26 @@ export function EtiquetaFormDialog({
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>
-            {editando ? "Editar etiqueta" : "Nuevo etiqueta"}
-          </DialogTitle>
+          <DialogTitle>{editando ? "Editar rubro" : "Nuevo rubro"}</DialogTitle>
           <DialogDescription>
-            El código se usa internamente; el nombre es el que se ve al cargar
-            un cliente.
+            El código se usa internamente; el nombre es el que se ve al cargar un
+            cliente.
           </DialogDescription>
         </DialogHeader>
 
-        <form
-          onSubmit={handleSubmit(onSubmit)}
-          className="space-y-4"
-          noValidate
-        >
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
           <div className="space-y-2">
             <Label htmlFor="codigo">Código</Label>
             <Input
               id="codigo"
               autoComplete="off"
               autoFocus
-              placeholder="ej: entrevista"
+              placeholder="ej: gastronomia"
               aria-invalid={Boolean(errors.codigo)}
               {...register("codigo")}
             />
             {errors.codigo ? (
-              <p className="text-sm text-destructive">
-                {errors.codigo.message}
-              </p>
+              <p className="text-sm text-destructive">{errors.codigo.message}</p>
             ) : null}
           </div>
 
@@ -136,9 +121,7 @@ export function EtiquetaFormDialog({
               {...register("nombre")}
             />
             {errors.nombre ? (
-              <p className="text-sm text-destructive">
-                {errors.nombre.message}
-              </p>
+              <p className="text-sm text-destructive">{errors.nombre.message}</p>
             ) : null}
           </div>
 
@@ -153,9 +136,7 @@ export function EtiquetaFormDialog({
               {...register("orden")}
             />
             {errors.orden ? (
-              <p className="text-sm text-destructive">
-                {errors.orden.message}
-              </p>
+              <p className="text-sm text-destructive">{errors.orden.message}</p>
             ) : (
               <p className="text-xs text-muted-foreground">
                 Más bajo aparece primero en el selector.
@@ -171,7 +152,7 @@ export function EtiquetaFormDialog({
               {...register("activo")}
             />
             <Label htmlFor="activo" className="font-normal">
-              Activa (visible al etiquetar clientes)
+              Activo (visible al elegir rubro de un cliente)
             </Label>
           </div>
 
@@ -199,7 +180,7 @@ export function EtiquetaFormDialog({
               ) : editando ? (
                 "Guardar cambios"
               ) : (
-                "Crear etiqueta"
+                "Crear rubro"
               )}
             </Button>
           </DialogFooter>

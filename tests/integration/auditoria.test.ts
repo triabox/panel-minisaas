@@ -27,7 +27,7 @@ vi.mock("@/core/auth", () => ({
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 const { registrarAuditoria } = await import("@/core/lib/audit");
-const { crearEtiqueta } = await import("@/modules/etiquetas/actions");
+const { crearRubro } = await import("@/modules/rubros/actions");
 
 describe("Auditoría (núcleo)", () => {
   const prisma = getTestPrisma();
@@ -46,7 +46,7 @@ describe("Auditoría (núcleo)", () => {
   beforeEach(async () => {
     sessionMock.current = { id: usuarioId, roles: ["super_admin"] };
     await prisma.auditLog.deleteMany();
-    await prisma.etiqueta.deleteMany();
+    await prisma.rubro.deleteMany();
   });
 
   it("registra un evento con usuario de la sesión", async () => {
@@ -80,14 +80,14 @@ describe("Auditoría (núcleo)", () => {
     expect(filas[0]!.usuarioId).toBeNull();
   });
 
-  it("las actions de dominio auditan (crear etiqueta deja rastro)", async () => {
-    const res = await crearEtiqueta({ codigo: "vip", nombre: "VIP" });
+  it("las actions de dominio auditan (crear rubro deja rastro)", async () => {
+    const res = await crearRubro({ codigo: "gastronomia", nombre: "Gastronomía" });
     expect(res.ok).toBe(true);
 
     const filas = await prisma.auditLog.findMany({
-      where: { modulo: "etiquetas", accion: "crear" },
+      where: { modulo: "rubros", accion: "crear" },
     });
     expect(filas).toHaveLength(1);
-    expect(filas[0]!.recursoTipo).toBe("Etiqueta");
+    expect(filas[0]!.recursoTipo).toBe("Rubro");
   });
 });

@@ -7,7 +7,12 @@ import { aplanarErrores, type ActionResult } from "@/core/lib/action-result";
 import { registrarAuditoria } from "@/core/lib/audit";
 import { prisma } from "@/core/lib/prisma";
 import { puedeOperar, tieneRolGestion } from "@/core/permisos";
-import { clienteInputSchema } from "./schemas";
+import type { ComboboxOption } from "@/core/ui/combobox";
+
+import { obtenerCapacidad } from "@/modules/capacidad/actions";
+import { horasHombrePorClienteEsteMes } from "@/modules/tickets/metricas";
+import { cambioEstadoSchema, clienteInputSchema } from "./schemas";
+import { calcularRiesgo } from "./riesgo";
 
 const AUDIT_MODULO = "clientes";
 
@@ -20,58 +25,96 @@ async function exigirPermisoOperacion() {
   return session.user;
 }
 
+/**
+ * Listado con riesgo DERIVADO por cliente: cruza estado de pago + horas del mes
+ * contra el umbral vigente. Ordena activos primero, luego por nombre.
+ */
 export async function listarClientes() {
   const session = await auth();
-  if (!session?.user) {
-    return [] as Array<{
-      id: string;
-      nombre: string;
-      email: string | null;
-      telefono: string | null;
-      activo: boolean;
-      etiquetas: Array<{ id: string; nombre: string }>;
-      createdAt: Date;
-    }>;
-  }
+  if (!session?.user) return [];
 
-  const clientes = await prisma.cliente.findMany({
-    orderBy: { nombre: "asc" },
-    include: {
-      etiquetas: {
-        include: { etiqueta: { select: { id: true, nombre: true } } },
-      },
-    },
+  const [clientes, horasMap, cap] = await Promise.all([
+    prisma.cliente.findMany({
+      orderBy: [{ estado: "asc" }, { negocio: "asc" }],
+      include: { rubro: { select: { nombre: true } } },
+    }),
+    horasHombrePorClienteEsteMes(),
+    obtenerCapacidad(),
+  ]);
+
+  return clientes.map((c) => {
+    const horasMes = horasMap.get(c.id) ?? 0;
+    const riesgo = calcularRiesgo({
+      estadoPago: c.estadoPago,
+      horasMes,
+      umbralHorasCliente: cap.umbralHorasCliente,
+    });
+    return {
+      id: c.id,
+      negocio: c.negocio,
+      rubro: c.rubro?.nombre ?? null,
+      sistema: c.sistema,
+      contactoNombre: c.contactoNombre,
+      abonoMensual: c.abonoMensual,
+      moneda: c.moneda,
+      estado: c.estado,
+      estadoPago: c.estadoPago,
+      horasMes,
+      umbralHorasCliente: cap.umbralHorasCliente,
+      enRiesgo: riesgo.enRiesgo,
+      motivosRiesgo: riesgo.motivos,
+    };
   });
-
-  return clientes.map((c) => ({
-    id: c.id,
-    nombre: c.nombre,
-    email: c.email,
-    telefono: c.telefono,
-    activo: c.activo,
-    etiquetas: c.etiquetas.map((e) => e.etiqueta),
-    createdAt: c.createdAt,
-  }));
 }
 
 export async function obtenerCliente(id: string) {
   const session = await auth();
   if (!session?.user || !id) return null;
 
-  const cliente = await prisma.cliente.findUnique({
-    where: { id },
-    include: { etiquetas: { select: { etiquetaId: true } } },
-  });
-  if (!cliente) return null;
+  const c = await prisma.cliente.findUnique({ where: { id } });
+  if (!c) return null;
   return {
-    id: cliente.id,
-    nombre: cliente.nombre,
-    email: cliente.email,
-    telefono: cliente.telefono,
-    notas: cliente.notas,
-    activo: cliente.activo,
-    etiquetasIds: cliente.etiquetas.map((e) => e.etiquetaId),
+    id: c.id,
+    negocio: c.negocio,
+    rubroId: c.rubroId,
+    sistema: c.sistema,
+    contactoNombre: c.contactoNombre,
+    contactoEmail: c.contactoEmail,
+    contactoTelefono: c.contactoTelefono,
+    fechaAlta: c.fechaAlta,
+    abonoMensual: c.abonoMensual,
+    moneda: c.moneda,
+    estado: c.estado,
+    estadoPago: c.estadoPago,
+    notas: c.notas,
   };
+}
+
+/**
+ * Buscador server-side para el selector de clientes (p.ej. al cargar un ticket).
+ * Excluye a los dados de baja. Nunca lista todo: filtra por texto.
+ */
+export async function buscarClientes(query: string): Promise<ComboboxOption[]> {
+  const session = await auth();
+  if (!session?.user) return [];
+  const q = query.trim();
+  if (q.length < 2) return [];
+
+  const clientes = await prisma.cliente.findMany({
+    where: {
+      estado: { not: "baja" },
+      negocio: { contains: q, mode: "insensitive" },
+    },
+    orderBy: { negocio: "asc" },
+    take: 20,
+    include: { rubro: { select: { nombre: true } } },
+  });
+
+  return clientes.map((c) => ({
+    value: c.id,
+    label: c.negocio,
+    hint: c.rubro?.nombre ?? undefined,
+  }));
 }
 
 export async function crearCliente(
@@ -87,15 +130,9 @@ export async function crearCliente(
       campos: aplanarErrores(parsed.error),
     };
   }
-  const { etiquetasIds, ...datos } = parsed.data;
 
   const cliente = await prisma.cliente.create({
-    data: {
-      ...datos,
-      etiquetas: {
-        create: etiquetasIds.map((etiquetaId) => ({ etiquetaId })),
-      },
-    },
+    data: parsed.data,
     select: { id: true },
   });
 
@@ -105,10 +142,11 @@ export async function crearCliente(
     recursoTipo: "Cliente",
     recursoId: cliente.id,
     valorNuevo: parsed.data,
-    detalle: datos.nombre,
+    detalle: parsed.data.negocio,
   });
 
   revalidatePath("/clientes");
+  revalidatePath("/inicio");
   return { ok: true, data: { id: cliente.id } };
 }
 
@@ -127,23 +165,11 @@ export async function actualizarCliente(
       campos: aplanarErrores(parsed.error),
     };
   }
-  const { etiquetasIds, ...datos } = parsed.data;
 
-  const anterior = await prisma.cliente.findUnique({
-    where: { id },
-    include: { etiquetas: { select: { etiquetaId: true } } },
-  });
+  const anterior = await prisma.cliente.findUnique({ where: { id } });
   if (!anterior) return { ok: false, error: "Cliente no encontrado." };
 
-  await prisma.$transaction(async (tx) => {
-    await tx.cliente.update({ where: { id }, data: datos });
-    await tx.clienteEtiqueta.deleteMany({ where: { clienteId: id } });
-    if (etiquetasIds.length > 0) {
-      await tx.clienteEtiqueta.createMany({
-        data: etiquetasIds.map((etiquetaId) => ({ clienteId: id, etiquetaId })),
-      });
-    }
-  });
+  await prisma.cliente.update({ where: { id }, data: parsed.data });
 
   await registrarAuditoria({
     modulo: AUDIT_MODULO,
@@ -151,45 +177,54 @@ export async function actualizarCliente(
     recursoTipo: "Cliente",
     recursoId: id,
     valorAnterior: {
-      nombre: anterior.nombre,
-      email: anterior.email,
-      telefono: anterior.telefono,
-      etiquetas: anterior.etiquetas.map((e) => e.etiquetaId),
+      negocio: anterior.negocio,
+      abonoMensual: anterior.abonoMensual,
+      estado: anterior.estado,
+      estadoPago: anterior.estadoPago,
     },
     valorNuevo: parsed.data,
+    detalle: parsed.data.negocio,
   });
 
   revalidatePath("/clientes");
+  revalidatePath("/inicio");
   return { ok: true, data: undefined };
 }
 
-export async function toggleClienteActivo(
+/** Cambio de estado comercial: activar / pausar / dar de baja (baja lógica). */
+export async function cambiarEstadoCliente(
   id: string,
-): Promise<ActionResult<{ activo: boolean }>> {
+  input: unknown,
+): Promise<ActionResult<{ estado: string }>> {
   await exigirPermisoOperacion();
+
+  const parsed = cambioEstadoSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Estado inválido." };
+
   const cliente = await prisma.cliente.findUnique({ where: { id } });
   if (!cliente) return { ok: false, error: "Cliente no encontrado." };
 
   const actualizado = await prisma.cliente.update({
     where: { id },
-    data: { activo: !cliente.activo },
+    data: { estado: parsed.data.estado },
   });
 
   await registrarAuditoria({
     modulo: AUDIT_MODULO,
-    accion: actualizado.activo ? "activar" : "desactivar",
+    accion: "cambiar_estado",
     recursoTipo: "Cliente",
     recursoId: id,
-    valorAnterior: { activo: cliente.activo },
-    valorNuevo: { activo: actualizado.activo },
-    detalle: cliente.nombre,
+    valorAnterior: { estado: cliente.estado },
+    valorNuevo: { estado: actualizado.estado },
+    detalle: cliente.negocio,
   });
 
   revalidatePath("/clientes");
-  return { ok: true, data: { activo: actualizado.activo } };
+  revalidatePath("/inicio");
+  return { ok: true, data: { estado: actualizado.estado } };
 }
 
-/** Eliminación real — solo gestión, con confirmación fuerte en la UI. */
+/** Eliminación real (borra el cliente y sus tickets en cascada) — solo gestión. */
 export async function eliminarCliente(id: string): Promise<ActionResult> {
   const session = await auth();
   if (!session?.user) return { ok: false, error: "No autenticado." };
@@ -208,9 +243,10 @@ export async function eliminarCliente(id: string): Promise<ActionResult> {
     recursoTipo: "Cliente",
     recursoId: id,
     valorAnterior: cliente,
-    detalle: cliente.nombre,
+    detalle: cliente.negocio,
   });
 
   revalidatePath("/clientes");
+  revalidatePath("/inicio");
   return { ok: true, data: undefined };
 }

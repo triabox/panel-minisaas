@@ -18,33 +18,55 @@ import { Input } from "@/core/ui/input";
 import { Label } from "@/core/ui/label";
 import { Textarea } from "@/core/ui/textarea";
 import { toast } from "sonner";
+
 import { actualizarCliente, crearCliente } from "@/modules/clientes/actions";
 
-export type EtiquetaOption = { id: string; codigo: string; nombre: string };
+export type RubroOption = { id: string; codigo: string; nombre: string };
+
+const SELECT_CLS =
+  "h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
 
 type FormValues = {
-  nombre: string;
-  email: string;
-  telefono: string;
+  negocio: string;
+  rubroId: string;
+  sistema: string;
+  contactoNombre: string;
+  contactoEmail: string;
+  contactoTelefono: string;
+  fechaAlta: string;
+  abonoMensual: string;
+  moneda: "USD" | "ARS";
+  estado: "activo" | "pausado" | "baja";
+  estadoPago: "al_dia" | "demorado" | "vencido";
   notas: string;
-  etiquetasIds: string[];
 };
 
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  etiquetas: EtiquetaOption[];
+  rubros: RubroOption[];
   initial?: {
     id: string;
-    nombre: string;
-    email: string | null;
-    telefono: string | null;
+    negocio: string;
+    rubroId: string | null;
+    sistema: string | null;
+    contactoNombre: string | null;
+    contactoEmail: string | null;
+    contactoTelefono: string | null;
+    fechaAlta: Date | string;
+    abonoMensual: number;
+    moneda: string;
+    estado: string;
+    estadoPago: string;
     notas: string | null;
-    etiquetasIds: string[];
   };
 };
 
-export function ClienteFormDialog({ open, onOpenChange, etiquetas, initial }: Props) {
+const hoyISO = () => new Date().toISOString().slice(0, 10);
+const aISO = (d: Date | string) =>
+  (d instanceof Date ? d : new Date(d)).toISOString().slice(0, 10);
+
+export function ClienteFormDialog({ open, onOpenChange, rubros, initial }: Props) {
   const router = useRouter();
   const [errorGlobal, setErrorGlobal] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -52,11 +74,18 @@ export function ClienteFormDialog({ open, onOpenChange, etiquetas, initial }: Pr
   const editando = Boolean(initial);
 
   const valoresIniciales = (): FormValues => ({
-    nombre: initial?.nombre ?? "",
-    email: initial?.email ?? "",
-    telefono: initial?.telefono ?? "",
+    negocio: initial?.negocio ?? "",
+    rubroId: initial?.rubroId ?? "",
+    sistema: initial?.sistema ?? "",
+    contactoNombre: initial?.contactoNombre ?? "",
+    contactoEmail: initial?.contactoEmail ?? "",
+    contactoTelefono: initial?.contactoTelefono ?? "",
+    fechaAlta: initial ? aISO(initial.fechaAlta) : hoyISO(),
+    abonoMensual: initial ? String(initial.abonoMensual) : "100",
+    moneda: (initial?.moneda as FormValues["moneda"]) ?? "USD",
+    estado: (initial?.estado as FormValues["estado"]) ?? "activo",
+    estadoPago: (initial?.estadoPago as FormValues["estadoPago"]) ?? "al_dia",
     notas: initial?.notas ?? "",
-    etiquetasIds: initial?.etiquetasIds ?? [],
   });
 
   const {
@@ -64,8 +93,6 @@ export function ClienteFormDialog({ open, onOpenChange, etiquetas, initial }: Pr
     handleSubmit,
     reset,
     setError,
-    setValue,
-    watch,
     formState: { errors },
   } = useForm<FormValues>({ defaultValues: valoresIniciales() });
 
@@ -73,15 +100,6 @@ export function ClienteFormDialog({ open, onOpenChange, etiquetas, initial }: Pr
     if (open) reset(valoresIniciales());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initial, reset]);
-
-  const seleccionadas = watch("etiquetasIds");
-
-  const toggleEtiqueta = (id: string) => {
-    const actual = new Set(seleccionadas);
-    if (actual.has(id)) actual.delete(id);
-    else actual.add(id);
-    setValue("etiquetasIds", [...actual]);
-  };
 
   const onSubmit = (values: FormValues) => {
     setErrorGlobal(null);
@@ -120,75 +138,150 @@ export function ClienteFormDialog({ open, onOpenChange, etiquetas, initial }: Pr
         <DialogHeader>
           <DialogTitle>{editando ? "Editar cliente" : "Nuevo cliente"}</DialogTitle>
           <DialogDescription>
-            Los datos de contacto son opcionales; el nombre alcanza para
-            empezar.
+            El nombre del negocio y el abono alcanzan para empezar; el resto es
+            opcional.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
           <div className="space-y-2">
-            <Label htmlFor="nombre">Nombre *</Label>
+            <Label htmlFor="negocio">Negocio *</Label>
             <Input
-              id="nombre"
+              id="negocio"
               autoComplete="off"
               autoFocus
-              aria-invalid={Boolean(errors.nombre)}
-              {...register("nombre", { required: "Ingresá el nombre." })}
+              aria-invalid={Boolean(errors.negocio)}
+              {...register("negocio", { required: "Ingresá el negocio." })}
             />
-            {errors.nombre ? (
-              <p className="text-sm text-destructive">{errors.nombre.message}</p>
+            {errors.negocio ? (
+              <p className="text-sm text-destructive">{errors.negocio.message}</p>
             ) : null}
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                autoComplete="off"
-                aria-invalid={Boolean(errors.email)}
-                {...register("email")}
-              />
-              {errors.email ? (
-                <p className="text-sm text-destructive">{errors.email.message}</p>
-              ) : null}
+              <Label htmlFor="rubroId">Rubro</Label>
+              <select id="rubroId" className={SELECT_CLS} {...register("rubroId")}>
+                <option value="">— Sin rubro —</option>
+                {rubros.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.nombre}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="telefono">Teléfono</Label>
+              <Label htmlFor="sistema">Sistema entregado</Label>
               <Input
-                id="telefono"
+                id="sistema"
                 autoComplete="off"
-                {...register("telefono")}
+                placeholder="ej: Turnos, Inventario…"
+                {...register("sistema")}
               />
             </div>
           </div>
 
-          {etiquetas.length > 0 ? (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="space-y-2">
-              <Label>Etiquetas</Label>
-              <div className="flex flex-wrap gap-2">
-                {etiquetas.map((e) => {
-                  const activa = seleccionadas.includes(e.id);
-                  return (
-                    <button
-                      key={e.id}
-                      type="button"
-                      onClick={() => toggleEtiqueta(e.id)}
-                      aria-pressed={activa}
-                      className={
-                        activa
-                          ? "rounded-full bg-primary-600 px-3 py-1 text-xs font-medium text-white"
-                          : "rounded-full border border-input px-3 py-1 text-xs font-medium text-muted-foreground hover:border-primary-300"
-                      }
-                    >
-                      {e.nombre}
-                    </button>
-                  );
-                })}
+              <Label htmlFor="fechaAlta">Alta *</Label>
+              <Input
+                id="fechaAlta"
+                type="date"
+                aria-invalid={Boolean(errors.fechaAlta)}
+                {...register("fechaAlta", { required: "Ingresá la fecha." })}
+              />
+              {errors.fechaAlta ? (
+                <p className="text-sm text-destructive">
+                  {errors.fechaAlta.message}
+                </p>
+              ) : null}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="abonoMensual">Abono mensual *</Label>
+              <Input
+                id="abonoMensual"
+                type="number"
+                min={0}
+                step="0.01"
+                aria-invalid={Boolean(errors.abonoMensual)}
+                {...register("abonoMensual", { required: "Ingresá el abono." })}
+              />
+              {errors.abonoMensual ? (
+                <p className="text-sm text-destructive">
+                  {errors.abonoMensual.message}
+                </p>
+              ) : null}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="moneda">Moneda</Label>
+              <select id="moneda" className={SELECT_CLS} {...register("moneda")}>
+                <option value="USD">US$ (dólares)</option>
+                <option value="ARS">$ (pesos)</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="estado">Estado</Label>
+              <select id="estado" className={SELECT_CLS} {...register("estado")}>
+                <option value="activo">Activo</option>
+                <option value="pausado">Pausado</option>
+                <option value="baja">Baja</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="estadoPago">Estado de pago</Label>
+              <select
+                id="estadoPago"
+                className={SELECT_CLS}
+                {...register("estadoPago")}
+              >
+                <option value="al_dia">Al día</option>
+                <option value="demorado">Paga demorado</option>
+                <option value="vencido">Pago vencido</option>
+              </select>
+            </div>
+          </div>
+
+          <fieldset className="space-y-3 rounded-lg border border-primary-100 p-3">
+            <legend className="px-1 text-xs font-medium text-muted-foreground">
+              Contacto
+            </legend>
+            <div className="space-y-2">
+              <Label htmlFor="contactoNombre">Nombre de contacto</Label>
+              <Input
+                id="contactoNombre"
+                autoComplete="off"
+                {...register("contactoNombre")}
+              />
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="contactoEmail">Email</Label>
+                <Input
+                  id="contactoEmail"
+                  type="email"
+                  autoComplete="off"
+                  aria-invalid={Boolean(errors.contactoEmail)}
+                  {...register("contactoEmail")}
+                />
+                {errors.contactoEmail ? (
+                  <p className="text-sm text-destructive">
+                    {errors.contactoEmail.message}
+                  </p>
+                ) : null}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="contactoTelefono">Teléfono</Label>
+                <Input
+                  id="contactoTelefono"
+                  autoComplete="off"
+                  {...register("contactoTelefono")}
+                />
               </div>
             </div>
-          ) : null}
+          </fieldset>
 
           <div className="space-y-2">
             <Label htmlFor="notas">Notas</Label>

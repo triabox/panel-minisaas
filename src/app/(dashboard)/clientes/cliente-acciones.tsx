@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal, Pencil, Power, Trash2 } from "lucide-react";
+import { MoreHorizontal, Pencil, Play, Pause, Ban, Trash2 } from "lucide-react";
 
 import {
   DropdownMenu,
@@ -14,23 +14,24 @@ import {
 import { Button } from "@/core/ui/button";
 import { toast } from "sonner";
 import {
+  cambiarEstadoCliente,
   eliminarCliente,
   obtenerCliente,
-  toggleClienteActivo,
 } from "@/modules/clientes/actions";
 
-import { ClienteFormDialog, type EtiquetaOption } from "./cliente-form-dialog";
+import { ClienteFormDialog, type RubroOption } from "./cliente-form-dialog";
 
 type Props = {
-  cliente: { id: string; nombre: string; activo: boolean };
-  etiquetas: EtiquetaOption[];
+  cliente: { id: string; negocio: string; estado: string };
+  rubros: RubroOption[];
   esGestion: boolean;
 };
 
-export function ClienteAcciones({ cliente, etiquetas, esGestion }: Props) {
+export function ClienteAcciones({ cliente, rubros, esGestion }: Props) {
   const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
-  const [initial, setInitial] = useState<Parameters<typeof ClienteFormDialog>[0]["initial"]>();
+  const [initial, setInitial] =
+    useState<Parameters<typeof ClienteFormDialog>[0]["initial"]>();
   const [, startTransition] = useTransition();
 
   const onEditar = () => {
@@ -45,11 +46,11 @@ export function ClienteAcciones({ cliente, etiquetas, esGestion }: Props) {
     });
   };
 
-  const onToggle = () => {
+  const onCambiarEstado = (estado: "activo" | "pausado" | "baja") => {
     startTransition(async () => {
-      const res = await toggleClienteActivo(cliente.id);
+      const res = await cambiarEstadoCliente(cliente.id, { estado });
       if (res.ok) {
-        toast.success(res.data.activo ? "Cliente activado" : "Cliente desactivado");
+        toast.success(`Cliente marcado como ${estado}.`);
         router.refresh();
       } else {
         toast.error(res.error);
@@ -60,7 +61,7 @@ export function ClienteAcciones({ cliente, etiquetas, esGestion }: Props) {
   const onEliminar = () => {
     if (
       !window.confirm(
-        `¿ELIMINAR a "${cliente.nombre}"?\n\nSe borra el cliente y sus etiquetas asociadas. Esta acción no se puede deshacer.`,
+        `¿ELIMINAR a "${cliente.negocio}"?\n\nSe borra el cliente y TODO su historial de horas. Esta acción no se puede deshacer.\n\nSi solo querés dejar de operarlo, usá "Dar de baja".`,
       )
     ) {
       return;
@@ -83,7 +84,7 @@ export function ClienteAcciones({ cliente, etiquetas, esGestion }: Props) {
           <Button
             size="icon"
             variant="ghost"
-            aria-label={`Acciones para ${cliente.nombre}`}
+            aria-label={`Acciones para ${cliente.negocio}`}
           >
             <MoreHorizontal className="size-4" />
           </Button>
@@ -93,10 +94,27 @@ export function ClienteAcciones({ cliente, etiquetas, esGestion }: Props) {
             <Pencil className="size-4" />
             Editar
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={onToggle}>
-            <Power className="size-4" />
-            {cliente.activo ? "Desactivar" : "Activar"}
-          </DropdownMenuItem>
+
+          <DropdownMenuSeparator />
+          {cliente.estado !== "activo" ? (
+            <DropdownMenuItem onSelect={() => onCambiarEstado("activo")}>
+              <Play className="size-4" />
+              Activar
+            </DropdownMenuItem>
+          ) : null}
+          {cliente.estado !== "pausado" ? (
+            <DropdownMenuItem onSelect={() => onCambiarEstado("pausado")}>
+              <Pause className="size-4" />
+              Pausar
+            </DropdownMenuItem>
+          ) : null}
+          {cliente.estado !== "baja" ? (
+            <DropdownMenuItem onSelect={() => onCambiarEstado("baja")}>
+              <Ban className="size-4" />
+              Dar de baja
+            </DropdownMenuItem>
+          ) : null}
+
           {esGestion ? (
             <>
               <DropdownMenuSeparator />
@@ -112,7 +130,7 @@ export function ClienteAcciones({ cliente, etiquetas, esGestion }: Props) {
       <ClienteFormDialog
         open={editOpen}
         onOpenChange={setEditOpen}
-        etiquetas={etiquetas}
+        rubros={rubros}
         initial={initial}
       />
     </>
