@@ -1,0 +1,4 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "prisma generate && (timeout 60 prisma migrate deploy || echo 'migrate deploy falló o expiró — revisar manualmente') && next build"
+}

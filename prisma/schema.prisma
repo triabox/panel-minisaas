@@ -1,0 +1,237 @@
+// =====================================================================
+// nucleo-minisaas — schema base
+//
+// KERNEL (no tocar en los hijos salvo parche del template):
+//   Persona, Usuario, PasswordResetToken, Rol, Permiso, RolPermiso,
+//   UsuarioRol, AuditLog, Documento.
+//
+// EJEMPLO (zona custom — renombrar/borrar al armar tu dominio):
+//   Cliente, Etiqueta, ClienteEtiqueta.
+//
+// Convención de fechas: las "fechas calendario" se guardan a 00:00 UTC
+// (ver src/core/lib/fechas.ts); los timestamps reales llevan hora real.
+// =====================================================================
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ========================================================
+// KERNEL — identidad
+// ========================================================
+
+/// Entidad raíz: toda persona física del sistema. Los roles de dominio
+/// (cliente, socia, paciente…) se modelan como relaciones, no duplicando
+/// datos. `anonimizada` implementa el derecho de supresión (Ley 25.326):
+/// se blanquea la PII pero se preservan los registros para estadística.
+model Persona {
+  id              String    @id @default(cuid())
+  nombre          String
+  apellido        String
+  documento       String?   @unique
+  email           String?
+  telefono        String?
+  fechaNacimiento DateTime?
+  notas           String?
+
+  anonimizada       Boolean   @default(false)
+  fechaAnonimizacion DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  usuario    Usuario?
+  documentos Documento[]
+
+  @@index([apellido, nombre])
+}
+
+/// Cuenta de acceso al sistema. Siempre pertenece a una Persona (1 a 1):
+/// el nombre visible sale de ahí.
+model Usuario {
+  id              String    @id @default(cuid())
+  personaId       String    @unique
+  email           String    @unique
+  passwordHash    String
+  emailVerificado Boolean   @default(false)
+  activo          Boolean   @default(true)
+  ultimoLogin     DateTime?
+
+  // Bloqueo por intentos fallidos (ver src/core/auth)
+  intentosFallidos Int       @default(0)
+  bloqueadoHasta   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  persona     Persona              @relation(fields: [personaId], references: [id], onDelete: Cascade)
+  roles       UsuarioRol[]
+  resetTokens PasswordResetToken[]
+  auditLogs   AuditLog[]
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  usuarioId String
+  tokenHash String    @unique
+  expiraEn  DateTime
+  usadoEn   DateTime?
+  createdAt DateTime  @default(now())
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId])
+}
+
+// ========================================================
+// KERNEL — RBAC
+// ========================================================
+
+model Rol {
+  id          String  @id @default(cuid())
+  codigo      String  @unique
+  nombre      String
+  descripcion String?
+  esSistema   Boolean @default(false)
+
+  permisos RolPermiso[]
+  usuarios UsuarioRol[]
+}
+
+model Permiso {
+  id      String @id @default(cuid())
+  modulo  String
+  recurso String
+  accion  String
+
+  roles RolPermiso[]
+
+  @@unique([modulo, recurso, accion])
+}
+
+enum ScopeTipo {
+  GLOBAL
+  PROPIO
+}
+
+model RolPermiso {
+  id        String    @id @default(cuid())
+  rolId     String
+  permisoId String
+  scope     ScopeTipo @default(GLOBAL)
+
+  rol     Rol     @relation(fields: [rolId], references: [id], onDelete: Cascade)
+  permiso Permiso @relation(fields: [permisoId], references: [id], onDelete: Cascade)
+
+  @@unique([rolId, permisoId])
+}
+
+model UsuarioRol {
+  id        String  @id @default(cuid())
+  usuarioId String
+  rolId     String
+  scopeId   String?
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  rol     Rol     @relation(fields: [rolId], references: [id], onDelete: Cascade)
+
+  @@unique([usuarioId, rolId, scopeId])
+}
+
+// ========================================================
+// KERNEL — auditoría y archivos
+// ========================================================
+
+/// Registro de auditoría (obligatorio en mutaciones sobre datos personales).
+/// Se escribe vía registrarAuditoria() de src/core/lib/audit.ts — nunca a mano.
+model AuditLog {
+  id            String   @id @default(cuid())
+  fecha         DateTime @default(now())
+  usuarioId     String?
+  ip            String?
+  userAgent     String?
+  modulo        String
+  accion        String
+  recursoTipo   String
+  recursoId     String?
+  valorAnterior Json?
+  valorNuevo    Json?
+  exito         Boolean  @default(true)
+  detalle       String?
+
+  usuario Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+
+  @@index([fecha])
+  @@index([usuarioId])
+  @@index([modulo, accion])
+}
+
+/// Contador de rate limiting con ventana fija (ver core/lib/rate-limit.ts).
+/// En DB para que funcione igual en serverless (memoria no compartida).
+model RateLimit {
+  clave         String   @id
+  contador      Int      @default(1)
+  ventanaInicio DateTime @default(now())
+}
+
+/// Archivo adjunto a una persona (se sirve con URL firmada, ver core/storage).
+model Documento {
+  id            String   @id @default(cuid())
+  personaId     String
+  tipo          String
+  nombre        String
+  archivoUrl    String   @unique
+  archivoNombre String
+  archivoTamano Int
+  notas         String?
+  createdAt     DateTime @default(now())
+
+  persona Persona @relation(fields: [personaId], references: [id], onDelete: Cascade)
+
+  @@index([personaId])
+}
+
+// ========================================================
+// EJEMPLO — borrá o renombrá esto al armar tu dominio real.
+// Demuestra el patrón entidad (Cliente) + catálogo (Etiqueta) + N-a-N.
+// ========================================================
+
+model Cliente {
+  id        String   @id @default(cuid())
+  nombre    String
+  email     String?
+  telefono  String?
+  notas     String?
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  etiquetas ClienteEtiqueta[]
+
+  @@index([nombre])
+}
+
+model Etiqueta {
+  id     String  @id @default(cuid())
+  codigo String  @unique
+  nombre String
+  activo Boolean @default(true)
+  orden  Int     @default(0)
+
+  clientes ClienteEtiqueta[]
+}
+
+model ClienteEtiqueta {
+  clienteId  String
+  etiquetaId String
+
+  cliente  Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  etiqueta Etiqueta @relation(fields: [etiquetaId], references: [id], onDelete: Cascade)
+
+  @@id([clienteId, etiquetaId])
+}
