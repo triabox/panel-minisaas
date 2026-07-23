@@ -1,0 +1,9 @@
+# Forzamos `npm install` en lugar del `npm ci` por defecto de Nixpacks.
+# El package-lock.json committeado no está "npm-ci-clean" (drift en deps
+# nativas OPCIONALES @emnapi de lightningcss/tailwind), por lo que `npm ci`
+# —estricto— aborta. `npm install` reconcilia ese drift SIN upgradear las
+# versiones de las dependencias de la app (verificado: el build queda igual).
+# Regenerar el lock desde cero NO es opción: sube deps por rangos ^ y rompe
+# el build de Next ("Failed to collect page data").
+[phases.install]
+cmds = ["npm install --no-audit --no-fund"]
