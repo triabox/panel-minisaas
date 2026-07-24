@@ -34,6 +34,10 @@ export const clienteInputSchema = z.object({
   ),
   contactoTelefono: textoOpcional(30),
   fechaAlta: z.coerce.date({ message: "Fecha de alta inválida." }),
+  fechaPrimerPago: z.preprocess(
+    (v) => (v === "" || v == null ? undefined : v),
+    z.coerce.date({ message: "Fecha inválida." }).optional(),
+  ),
   abonoMensual: z.coerce
     .number({ message: "El abono tiene que ser un número." })
     .min(0, "El abono no puede ser negativo.")

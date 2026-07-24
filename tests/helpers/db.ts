@@ -30,6 +30,9 @@ export async function resetTestDb() {
   const tablas = [
     "RateLimit",
     "Ticket",
+    "Mejora",
+    "ProspectoEvento",
+    "Prospecto",
     "Cliente",
     "Rubro",
     "ConfiguracionCapacidad",

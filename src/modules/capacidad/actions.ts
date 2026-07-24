@@ -11,7 +11,7 @@ import { capacidadInputSchema, type Capacidad } from "./schemas";
 
 const AUDIT_MODULO = "capacidad";
 const SINGLETON = "singleton";
-const DEFAULTS = { horasSoporteMes: 120, clientesObjetivo: 60 };
+const DEFAULTS = { horasSoporteMes: 120, clientesObjetivo: 60, mesesEntreMejoras: 2 };
 
 /**
  * Lee la configuración de capacidad (fila única) y deriva el umbral de horas
@@ -28,6 +28,7 @@ export async function obtenerCapacidad(): Promise<Capacidad> {
     horasSoporteMes,
     clientesObjetivo,
     umbralHorasCliente: horasSoporteMes / clientesObjetivo,
+    mesesEntreMejoras: cfg?.mesesEntreMejoras ?? DEFAULTS.mesesEntreMejoras,
   };
 }
 

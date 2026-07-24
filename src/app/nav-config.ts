@@ -8,6 +8,8 @@ import {
   LayoutDashboard,
   Building2,
   Clock,
+  MapPinned,
+  Sparkles,
   UserCog,
   Settings,
   ShieldCheck,
@@ -23,6 +25,8 @@ export function obtenerNavGrupos(roles: string[]): NavGrupo[] {
         { href: "/inicio", label: "Salud del negocio", icon: LayoutDashboard },
         { href: "/clientes", label: "Clientes", icon: Building2 },
         { href: "/horas", label: "Registro de horas", icon: Clock },
+        { href: "/roadmap", label: "Roadmap de mejoras", icon: Sparkles },
+        { href: "/pipeline", label: "Pipeline", icon: MapPinned },
       ],
     },
   ];

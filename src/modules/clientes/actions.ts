@@ -9,10 +9,12 @@ import { prisma } from "@/core/lib/prisma";
 import { puedeOperar, tieneRolGestion } from "@/core/permisos";
 import type { ComboboxOption } from "@/core/ui/combobox";
 
-import { obtenerCapacidad } from "@/modules/capacidad/actions";
-import { horasHombrePorClienteEsteMes } from "@/modules/tickets/metricas";
+import { actorDeSesion } from "@/modules/_shared/actor";
 import { cambioEstadoSchema, clienteInputSchema } from "./schemas";
-import { calcularRiesgo } from "./riesgo";
+import {
+  buscarClientesConActor,
+  listarClientesConActor,
+} from "./service";
 
 const AUDIT_MODULO = "clientes";
 
@@ -28,43 +30,10 @@ async function exigirPermisoOperacion() {
 /**
  * Listado con riesgo DERIVADO por cliente: cruza estado de pago + horas del mes
  * contra el umbral vigente. Ordena activos primero, luego por nombre.
+ * La lógica vive en `service.ts` (compartida con la capa MCP).
  */
 export async function listarClientes() {
-  const session = await auth();
-  if (!session?.user) return [];
-
-  const [clientes, horasMap, cap] = await Promise.all([
-    prisma.cliente.findMany({
-      orderBy: [{ estado: "asc" }, { negocio: "asc" }],
-      include: { rubro: { select: { nombre: true } } },
-    }),
-    horasHombrePorClienteEsteMes(),
-    obtenerCapacidad(),
-  ]);
-
-  return clientes.map((c) => {
-    const horasMes = horasMap.get(c.id) ?? 0;
-    const riesgo = calcularRiesgo({
-      estadoPago: c.estadoPago,
-      horasMes,
-      umbralHorasCliente: cap.umbralHorasCliente,
-    });
-    return {
-      id: c.id,
-      negocio: c.negocio,
-      rubro: c.rubro?.nombre ?? null,
-      sistema: c.sistema,
-      contactoNombre: c.contactoNombre,
-      abonoMensual: c.abonoMensual,
-      moneda: c.moneda,
-      estado: c.estado,
-      estadoPago: c.estadoPago,
-      horasMes,
-      umbralHorasCliente: cap.umbralHorasCliente,
-      enRiesgo: riesgo.enRiesgo,
-      motivosRiesgo: riesgo.motivos,
-    };
-  });
+  return listarClientesConActor(await actorDeSesion());
 }
 
 export async function obtenerCliente(id: string) {
@@ -82,6 +51,7 @@ export async function obtenerCliente(id: string) {
     contactoEmail: c.contactoEmail,
     contactoTelefono: c.contactoTelefono,
     fechaAlta: c.fechaAlta,
+    fechaPrimerPago: c.fechaPrimerPago,
     abonoMensual: c.abonoMensual,
     moneda: c.moneda,
     estado: c.estado,
@@ -92,29 +62,10 @@ export async function obtenerCliente(id: string) {
 
 /**
  * Buscador server-side para el selector de clientes (p.ej. al cargar un ticket).
- * Excluye a los dados de baja. Nunca lista todo: filtra por texto.
+ * Excluye a los dados de baja. La lógica vive en `service.ts`.
  */
 export async function buscarClientes(query: string): Promise<ComboboxOption[]> {
-  const session = await auth();
-  if (!session?.user) return [];
-  const q = query.trim();
-  if (q.length < 2) return [];
-
-  const clientes = await prisma.cliente.findMany({
-    where: {
-      estado: { not: "baja" },
-      negocio: { contains: q, mode: "insensitive" },
-    },
-    orderBy: { negocio: "asc" },
-    take: 20,
-    include: { rubro: { select: { nombre: true } } },
-  });
-
-  return clientes.map((c) => ({
-    value: c.id,
-    label: c.negocio,
-    hint: c.rubro?.nombre ?? undefined,
-  }));
+  return buscarClientesConActor(await actorDeSesion(), query);
 }
 
 export async function crearCliente(

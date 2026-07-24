@@ -248,12 +248,14 @@ model Cliente {
   estado           EstadoCliente @default(activo)
   estadoPago       EstadoPago    @default(al_dia)
   ultimaActividad  DateTime? // proxy de "usa el sistema" (se explota en v2/v3)
+  fechaPrimerPago  DateTime? // habilita la 1ª mejora del roadmap (en v2 lo setea MP)
   notas            String?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
   rubro   Rubro?   @relation(fields: [rubroId], references: [id], onDelete: SetNull)
   tickets Ticket[]
+  mejoras Mejora[]
 
   @@index([negocio])
   @@index([estado])
@@ -267,7 +269,8 @@ model Rubro {
   activo Boolean @default(true)
   orden  Int     @default(0)
 
-  clientes Cliente[]
+  clientes   Cliente[]
+  prospectos Prospecto[]
 }
 
 /// El corazón del panel: cada pedido/ticket con sus horas. `fecha` es un
@@ -296,5 +299,91 @@ model ConfiguracionCapacidad {
   id               String   @id @default("singleton")
   horasSoporteMes  Int      @default(120)
   clientesObjetivo Int      @default(60)
+  /// Cadencia base del roadmap: meses entre mejoras entregadas (se estira si
+  /// el cliente consume mucho soporte). Ver src/modules/mejoras.
+  mesesEntreMejoras Int     @default(2)
   updatedAt        DateTime @updatedAt
+}
+
+// ========================================================
+// v2 — Roadmap de mejoras
+// ========================================================
+
+/// Estado de una mejora comprometida con un cliente.
+enum EstadoMejora {
+  pendiente
+  habilitada
+  entregada
+}
+
+/// Mejora del roadmap de un cliente. La 1ª se habilita tras `fechaPrimerPago`;
+/// las siguientes cada `mesesEntreMejoras` desde la última entrega.
+model Mejora {
+  id                String       @id @default(cuid())
+  clienteId         String
+  titulo            String
+  descripcion       String?
+  estado            EstadoMejora @default(pendiente)
+  fechaHabilitacion DateTime? // desde cuándo se puede entregar
+  fechaEntrega      DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  @@index([clienteId])
+  @@index([estado])
+}
+
+// ========================================================
+// v2 — Pipeline de prospectos + mapa
+// ========================================================
+
+/// Embudo comercial. Las horas por estado (ProspectoEvento) alimentan el CAC.
+enum EstadoProspecto {
+  contactado
+  demo
+  prueba
+  cerrado
+  descartado
+}
+
+model Prospecto {
+  id                String          @id @default(cuid())
+  negocio           String
+  rubroId           String?
+  contactoNombre    String?
+  contactoEmail     String?
+  contactoTelefono  String?
+  direccion         String?
+  latitud           Float?
+  longitud          Float?
+  estado            EstadoProspecto @default(contactado)
+  fechaRecordatorio DateTime? // "seguir a fulano en X días"
+  notas             String?
+  origen            String? // cómo se descubrió (p.ej. "mcp", "manual")
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  rubro   Rubro?             @relation(fields: [rubroId], references: [id], onDelete: SetNull)
+  eventos ProspectoEvento[]
+
+  @@index([negocio])
+  @@index([estado])
+  @@index([fechaRecordatorio])
+}
+
+/// Registro de trabajo/movimiento sobre un prospecto. `horas` acumula el
+/// esfuerzo por estado → CAC = suma de horas hasta cerrarlo.
+model ProspectoEvento {
+  id          String          @id @default(cuid())
+  prospectoId String
+  estado      EstadoProspecto
+  horas       Float           @default(0)
+  nota        String?
+  fecha       DateTime        @default(now())
+
+  prospecto Prospecto @relation(fields: [prospectoId], references: [id], onDelete: Cascade)
+
+  @@index([prospectoId])
 }

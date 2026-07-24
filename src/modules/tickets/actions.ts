@@ -9,6 +9,7 @@ import { prisma } from "@/core/lib/prisma";
 import { puedeOperar, tieneRolGestion } from "@/core/permisos";
 
 import { ticketInputSchema } from "./schemas";
+import { crearTicketCore } from "./service";
 
 const AUDIT_MODULO = "tickets";
 
@@ -69,44 +70,20 @@ export async function obtenerTicket(id: string) {
 export async function crearTicket(
   input: unknown,
 ): Promise<ActionResult<{ id: string }>> {
-  await exigirPermisoOperacion();
+  const user = await exigirPermisoOperacion();
 
-  const parsed = ticketInputSchema.safeParse(input);
-  if (!parsed.success) {
-    return {
-      ok: false,
-      error: "Revisá los datos del ticket.",
-      campos: aplanarErrores(parsed.error),
-    };
+  // La lógica vive en service.ts (compartida con la capa MCP).
+  const res = await crearTicketCore(
+    { usuarioId: user.id, roles: user.roles },
+    input,
+  );
+
+  if (res.ok) {
+    revalidatePath("/horas");
+    revalidatePath("/clientes");
+    revalidatePath("/inicio");
   }
-
-  const cliente = await prisma.cliente.findUnique({
-    where: { id: parsed.data.clienteId },
-    select: { id: true, negocio: true },
-  });
-  if (!cliente) {
-    return { ok: false, error: "El cliente elegido no existe." };
-  }
-
-  const { fecha, ...resto } = parsed.data;
-  const ticket = await prisma.ticket.create({
-    data: { ...resto, ...(fecha ? { fecha } : {}) },
-    select: { id: true },
-  });
-
-  await registrarAuditoria({
-    modulo: AUDIT_MODULO,
-    accion: "crear",
-    recursoTipo: "Ticket",
-    recursoId: ticket.id,
-    valorNuevo: parsed.data,
-    detalle: `${cliente.negocio} · ${parsed.data.tipo}`,
-  });
-
-  revalidatePath("/horas");
-  revalidatePath("/clientes");
-  revalidatePath("/inicio");
-  return { ok: true, data: { id: ticket.id } };
+  return res;
 }
 
 export async function actualizarTicket(

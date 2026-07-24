@@ -25,4 +25,6 @@ export type Capacidad = {
   clientesObjetivo: number;
   /** Techo de horas/cliente/mes derivado de la meta. */
   umbralHorasCliente: number;
+  /** Cadencia base del roadmap de mejoras (meses entre entregas). */
+  mesesEntreMejoras: number;
 };

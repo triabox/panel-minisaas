@@ -38,6 +38,7 @@ type FormValues = {
   moneda: "USD" | "ARS";
   estado: "activo" | "pausado" | "baja";
   estadoPago: "al_dia" | "demorado" | "vencido";
+  fechaPrimerPago: string;
   notas: string;
 };
 
@@ -54,6 +55,7 @@ type Props = {
     contactoEmail: string | null;
     contactoTelefono: string | null;
     fechaAlta: Date | string;
+    fechaPrimerPago: Date | string | null;
     abonoMensual: number;
     moneda: string;
     estado: string;
@@ -85,6 +87,8 @@ export function ClienteFormDialog({ open, onOpenChange, rubros, initial }: Props
     moneda: (initial?.moneda as FormValues["moneda"]) ?? "USD",
     estado: (initial?.estado as FormValues["estado"]) ?? "activo",
     estadoPago: (initial?.estadoPago as FormValues["estadoPago"]) ?? "al_dia",
+    fechaPrimerPago:
+      initial?.fechaPrimerPago != null ? aISO(initial.fechaPrimerPago) : "",
     notas: initial?.notas ?? "",
   });
 
@@ -242,6 +246,19 @@ export function ClienteFormDialog({ open, onOpenChange, rubros, initial }: Props
                 <option value="vencido">Pago vencido</option>
               </select>
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="fechaPrimerPago">Fecha del primer pago</Label>
+            <Input
+              id="fechaPrimerPago"
+              type="date"
+              {...register("fechaPrimerPago")}
+            />
+            <p className="text-xs text-muted-foreground">
+              Habilita la primera mejora del roadmap. Dejala vacía si todavía no
+              pagó.
+            </p>
           </div>
 
           <fieldset className="space-y-3 rounded-lg border border-primary-100 p-3">
