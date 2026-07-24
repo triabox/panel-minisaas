@@ -17,6 +17,7 @@ import { crearTicketCore } from "@/modules/tickets/service";
 import { obtenerRoadmap, marcarMejoraEntregadaCore } from "@/modules/mejoras/service";
 import {
   crearProspectoCore,
+  eliminarProspectoCore,
   listarProspectosConActor,
   moverProspectoCore,
 } from "@/modules/prospectos/service";
@@ -146,6 +147,16 @@ const handler = createMcpHandler(
       },
       async ({ prospectoId, estado, horas }) =>
         texto(await moverProspectoCore(ACTOR_SISTEMA, prospectoId, { estado, horas })),
+    );
+
+    server.registerTool(
+      "eliminar_prospecto",
+      {
+        description: "Elimina un prospecto del pipeline por su id.",
+        inputSchema: { prospectoId: z.string() },
+      },
+      async ({ prospectoId }) =>
+        texto(await eliminarProspectoCore(ACTOR_SISTEMA, prospectoId)),
     );
 
     server.registerTool(

@@ -4,14 +4,13 @@ import { revalidatePath } from "next/cache";
 
 import { auth } from "@/core/auth";
 import { type ActionResult } from "@/core/lib/action-result";
-import { registrarAuditoria } from "@/core/lib/audit";
-import { prisma } from "@/core/lib/prisma";
 import { puedeOperar, tieneRolGestion } from "@/core/permisos";
 
 import { actorDeSesion } from "@/modules/_shared/actor";
 import {
   actualizarProspectoCore,
   crearProspectoCore,
+  eliminarProspectoCore,
   moverProspectoCore,
   obtenerProspecto as obtenerProspectoService,
 } from "./service";
@@ -79,18 +78,10 @@ export async function eliminarProspecto(id: string): Promise<ActionResult> {
   if (!tieneRolGestion(session.user.roles)) {
     return { ok: false, error: "No tenés permiso para eliminar prospectos." };
   }
-  const prospecto = await prisma.prospecto.findUnique({ where: { id } });
-  if (!prospecto) return { ok: false, error: "Prospecto no encontrado." };
-
-  await prisma.prospecto.delete({ where: { id } });
-  await registrarAuditoria({
-    modulo: "prospectos",
-    accion: "eliminar",
-    recursoTipo: "Prospecto",
-    recursoId: id,
-    valorAnterior: { negocio: prospecto.negocio, estado: prospecto.estado },
-    detalle: prospecto.negocio,
-  });
-  revalidar();
-  return { ok: true, data: undefined };
+  const res = await eliminarProspectoCore(
+    { usuarioId: session.user.id, roles: session.user.roles },
+    id,
+  );
+  if (res.ok) revalidar();
+  return res;
 }

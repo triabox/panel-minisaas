@@ -194,6 +194,26 @@ export async function actualizarProspectoCore(
   return { ok: true, data: undefined };
 }
 
+export async function eliminarProspectoCore(
+  actor: Actor,
+  id: string,
+): Promise<ActionResult> {
+  const prospecto = await prisma.prospecto.findUnique({ where: { id } });
+  if (!prospecto) return { ok: false, error: "Prospecto no encontrado." };
+
+  await prisma.prospecto.delete({ where: { id } });
+  await registrarAuditoria({
+    modulo: "prospectos",
+    accion: "eliminar",
+    recursoTipo: "Prospecto",
+    recursoId: id,
+    valorAnterior: { negocio: prospecto.negocio, estado: prospecto.estado },
+    detalle: prospecto.negocio,
+    usuarioId: actor.usuarioId,
+  });
+  return { ok: true, data: undefined };
+}
+
 /** Mueve el prospecto de estado y registra las horas invertidas (CAC). */
 export async function moverProspectoCore(
   actor: Actor,
